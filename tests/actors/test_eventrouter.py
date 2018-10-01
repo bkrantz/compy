@@ -1,6 +1,6 @@
 import unittest
 
-from compy.actors import EventFilter, EventRouter, EventXMLFilter, EventXMLXpathsFilter
+from compy.actors.eventrouter import EventFilter, EventRouter, EventXMLFilter, EventXMLXpathsFilter
 from compy.errors import QueueEmpty
 from compy.event import Event, XMLEvent
 from compy.testutils.test_actor import TestActorWrapper

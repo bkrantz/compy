@@ -17,7 +17,8 @@ from compy.logger import Logger
 from compy.restartlet import RestartPool
 from compy.errors import (QueueConnected, InvalidActorOutput, QueueEmpty, InvalidEventConversion, 
     InvalidActorInput, QueueFull)
-from compy.actors import STDOUT, EventLogger
+from compy.actors.stdout import STDOUT
+from compy.actors.eventlogger import EventLogger
 
 class MockedAsyncClass:
     cleared = False

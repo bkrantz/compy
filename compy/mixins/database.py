@@ -1,7 +1,5 @@
 
-from compy.mixins.database import _DatabaseMixin, _XMLDatabaseMixin, _JSONDatabaseMixin
 from compy.mixins.event import JSONEventModifyMixin, XMLEventModifyMixin, LookupMixin, XPathLookupMixin
-
 
 __all__ = [
 	"_DatabaseMixin",

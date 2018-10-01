@@ -1,9 +1,9 @@
 import unittest
 
-from compy.actors import EventAttributeModifier, JSONEventAttributeDelete, EventAttributeDelete, EventAttributeRegexSubstitution
+#from compy.actors import EventAttributeModifier, JSONEventAttributeDelete, EventAttributeDelete, EventAttributeRegexSubstitution
 from compy.event import JSONEvent, Event
 from compy.testutils.test_actor import TestActorWrapper
-
+'''
 class TestEventAttributeModifier(unittest.TestCase):
     def test_init(self):
         with self.assertRaises(TypeError):
@@ -93,3 +93,4 @@ class TestEventRegexSubstitution(unittest.TestCase):
         actor.input = _input
         output = actor.output
         self.assertEquals(output.foo, 'the far car')
+'''

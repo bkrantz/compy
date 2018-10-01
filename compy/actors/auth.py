@@ -1,5 +1,6 @@
-from compy.actors.mysql import _MySQLMixin
-from compy.actors.database import _Database, _DatabaseMixin
+from compy.mixins.mysql import _MySQLMixin
+from compy.actors.database import _Database
+from compy.mixins.database import _DatabaseMixin
 from compy.mixins.auth import _AuthDatabaseMixin, _BasicAuthDatabaseMixin
 
 __all__ = [

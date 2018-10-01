@@ -32,9 +32,9 @@ from functools import wraps
 from gevent import pywsgi
 from gevent.queue import Queue
 
-from compysition.actor import Actor
-from compysition.errors import InvalidEventDataModification, MalformedEventData, ResourceNotFound
-from compysition.event import HttpEvent, JSONHttpEvent, XMLHttpEvent
+from compy.actor import Actor
+from compy.errors import InvalidEventDataModification, MalformedEventData, ResourceNotFound
+from compy.event import HttpEvent, JSONHttpEvent, XMLHttpEvent
 
 BaseRequest.MEMFILE_MAX = 1024 * 1024 # (or whatever you want)
 
@@ -277,9 +277,9 @@ class HTTPServer(Actor, Bottle):
                 }
             },
             "response": {
-                "headers": {}
-                "status": 200,
-            }
+                "headers": {},
+                "status": 200
+            },
             "remote": {
                 "address": environ["REMOTE_ADDR"],
                 "port": environ["REMOTE_PORT"]

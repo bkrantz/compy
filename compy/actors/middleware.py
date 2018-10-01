@@ -1,10 +1,10 @@
-from compysition.actor import Actor
 import mimeparse
-from compysition.errors import InvalidEventDataModification, MalformedEventData, ResourceNotFound
-from compysition.event import HttpEvent, JSONHttpEvent, XMLHttpEvent
 from bottle import *
 from collections import defaultdict
-from util.event import response_statuses
+
+from compy.actor import Actor
+from compy.errors import InvalidEventDataModification, MalformedEventData, ResourceNotFound
+from compy.event import HttpEvent, JSONHttpEvent, XMLHttpEvent, response_statuses
 
 __all__ = [
 	"HeaderController",
@@ -70,7 +70,7 @@ class __HTTPInterpretor(Actor):
 	DEFAULTING_CONTENT_TYPES = ["", None]
 	CONVERTING_ACCEPTS = ["*/*", "", None]
 	MIME_TYPES = {
-		"application":[
+		"application":{
 			"xml":{
 				"event_class": XMLHttpEvent
 			},
@@ -88,8 +88,8 @@ class __HTTPInterpretor(Actor):
 				"data_source": "forms",
 				"interpreted_type": "text/plain"
 			}
-		],
-		"text":[
+		},
+		"text":{
 			"xml":{
 				"event_class": XMLHttpEvent
 			},
@@ -97,7 +97,7 @@ class __HTTPInterpretor(Actor):
 				"event_class": JSONHttpEvent
 			},
 			"plain":{}
-		]
+		}
 	}
 	CONTENT_TYPES = ["%s/%s" % (main_type, sub_type) for main_type in MIME_TYPES.iterkeys() for sub_type in MIME_TYPES[main_type].iterkeys() ]
 
@@ -135,60 +135,60 @@ class RequestInterpretor(__HTTPInterpretor):
 			self.send_event(event)
 
 class ResponseInterpretor(__HTTPInterpretor):
-    def format_response_data(self, event):
-        if event.error:
-            if isinstance(event, JSONEvent):
-                response_data = json.dumps({"errors": event.format_error()})
-            else:
-                response_data = event.error_string()
-        else:
-            if not isinstance(event.data, (list, dict, str)) or \
-                    (isinstance(event.data, dict) and \
-                    	len(event.data) == 1 and \
-                    	event.data.get("data", None)):
-                response_data = event.data_string()
-            else:
-                response_dict = event.data
-                if self.use_response_wrapper and getattr(event, "use_response_wrapper", True):
-                    response_dict = {'data': event.data}
+	def format_response_data(self, event):
+		if event.error:
+			if isinstance(event, JSONEvent):
+				response_data = json.dumps({"errors": event.format_error()})
+			else:
+				response_data = event.error_string()
+		else:
+			if not isinstance(event.data, (list, dict, str)) or \
+					(isinstance(event.data, dict) and \
+						len(event.data) == 1 and \
+						event.data.get("data", None)):
+				response_data = event.data_string()
+			else:
+				response_dict = event.data
+				if self.use_response_wrapper and getattr(event, "use_response_wrapper", True):
+					response_dict = {'data': event.data}
 
-                if event.pagination:
-                    limit, offset = event._pagination['limit'], event._pagination['offset']
-                    results_length = len(event.data)
-                    qs = '?limit={limit}&offset={offset}'
-                    base_url = '{path}'.format(path=event.environment['PATH_INFO'])
+				if event.pagination:
+					limit, offset = event._pagination['limit'], event._pagination['offset']
+					results_length = len(event.data)
+					qs = '?limit={limit}&offset={offset}'
+					base_url = '{path}'.format(path=event.environment['PATH_INFO'])
 
-                    links = {}
-                    links['prev'] = base_url + qs.format(limit=limit, offset=offset)
+					links = {}
+					links['prev'] = base_url + qs.format(limit=limit, offset=offset)
 
-                    if limit <= results_length:
-                        new_offset = offset + limit
-                        links['next'] = base_url + qs.format(limit=limit, offset=new_offset)
+					if limit <= results_length:
+						new_offset = offset + limit
+						links['next'] = base_url + qs.format(limit=limit, offset=new_offset)
 
-                    response_dict.update({'_pagination': links})
+					response_dict.update({'_pagination': links})
 
-                response_data = json.dumps(response_dict)
+				response_data = json.dumps(response_dict)
 
-        return response_data
+		return response_data
 
 	def consume(self, event):
 		accept = event.environment["request"]["headers"].get("Accept", "").split(";")[0]
 		content_type = event.environment["request"].get("interpreted_content_type", None)
 		interpreted_mime_type, event_class, _ = self._interpret_mime_type(raw_mime=accept, default_raw_mime=content_type)
 		
-        if not isinstance(event, event_class):
-            self.logger.warning("Incoming event did did not match the clients Accept format. Converting '{current}' to '{new}'".format(current=type(event), new=original_event_class.__name__))
-            event = event.convert(event_class)
+		if not isinstance(event, event_class):
+			self.logger.warning("Incoming event did did not match the clients Accept format. Converting '{current}' to '{new}'".format(current=type(event), new=original_event_class.__name__))
+			event = event.convert(event_class)
 
-        local_response = HTTPResponse()
-        status, status_message = event.status, response_statuses.get(event.status, "")
-        local_response.status = "{code} {message}".format(code=status, message=status_message)
+		local_response = HTTPResponse()
+		status, status_message = event.status, response_statuses.get(event.status, "")
+		local_response.status = "{code} {message}".format(code=status, message=status_message)
 
-        for header, value in event.environment["response"]["headers"].iteritems():
-            local_response.set_header(header, value)
-        local_response.set_header("Content-Type", interpreted_mime_type)
+		for header, value in event.environment["response"]["headers"].iteritems():
+			local_response.set_header(header, value)
+		local_response.set_header("Content-Type", interpreted_mime_type)
 
-        response_data = self.format_response_data(event)
+		response_data = self.format_response_data(event)
 
 
 class RequestRouter(Actor):

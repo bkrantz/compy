@@ -9,7 +9,8 @@ try:
         VERSION = re.search("__version__\s*=\s*'(.*)'", init.read(), re.M).group(1)
 except (AttributeError, IndexError, OSError, IOError) as e:
     VERSION = ''
-REQUIRES = ["gevent",
+REQUIRES = ["pymysql",
+            "gevent",
             "greenlet",
             "pyzmq",
             "amqp",

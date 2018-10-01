@@ -7,7 +7,9 @@ import traceback
 from gevent import signal as gsignal, event
 
 from compy.actor import Actor
-from compy.actors import Null, STDOUT, EventLogger
+from compy.actors.null import Null
+from compy.actors.stdout import STDOUT
+from compy.actors.eventlogger import EventLogger
 from compy.errors import ActorInitFailure
 
 class Director(object):

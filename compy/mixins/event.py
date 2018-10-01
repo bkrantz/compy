@@ -1,6 +1,6 @@
 from lxml import etree
-from compysition.event import JSONEvent, XMLEvent
-from compysition.actors.util.xpath import XPathLookup
+from compy.event import JSONEvent, XMLEvent
+from compy.actors.util.xpath import XPathLookup
 import re
 
 __all__ = [

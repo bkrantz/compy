@@ -1,6 +1,7 @@
-from compysition.actor import Actor
+from compy.actor import Actor
 from compy.mixins.event import JSONEventModifyMixin, XMLEventModifyMixin, LookupMixin, XPathLookupMixin
-from compysition.errors import MalformedEventData, CompysitionException
+from compy.mixins.modifiers import _ModifyMixin
+from compy.errors import MalformedEventData, CompysitionException
 
 __all__ = [
     "XMLEventUpdater",
