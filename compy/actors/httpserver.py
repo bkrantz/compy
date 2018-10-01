@@ -225,8 +225,6 @@ class HTTPServer(Actor, Bottle):
         return Bottle.__call__(self, e, h)
 
     def consume(self, event, *args, **kwargs):
-        # There is an error that results in responding with an empty list that will cause an internal server error
-
         response_queue = self.responders.pop(event.event_id, None)
 
         if response_queue:
@@ -246,7 +244,6 @@ class HTTPServer(Actor, Bottle):
             self.logger.warning("Received event response for an unknown event ID. The request might have already received a response", event=event)
 
     def __format_env(self, environ):
-        print dir(environ)
         return {
             "request": {
                 "headers": {key: value for key, value in request.headers.iteritems()},
