@@ -1,0 +1,11 @@
+language: python
+python:
+  - "2.7"
+before_install:
+  - sudo apt-get -qq update
+  - make dependencies
+  - make install-pytest
+install:
+  - make install
+script:
+  - pytest
