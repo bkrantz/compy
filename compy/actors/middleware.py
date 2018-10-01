@@ -175,21 +175,13 @@ class ResponseInterpretor(__HTTPInterpretor):
 		accept = event.environment["request"]["headers"].get("Accept", "").split(";")[0]
 		content_type = event.environment["request"].get("interpreted_content_type", None)
 		interpreted_mime_type, event_class, _ = self._interpret_mime_type(raw_mime=accept, default_raw_mime=content_type)
-		
+		event.environment["response"]["headers"]["Content-Type"] = interpreted_mime_type
+
 		if not isinstance(event, event_class):
 			self.logger.warning("Incoming event did did not match the clients Accept format. Converting '{current}' to '{new}'".format(current=type(event), new=original_event_class.__name__))
 			event = event.convert(event_class)
 
-		local_response = HTTPResponse()
-		status, status_message = event.status, response_statuses.get(event.status, "")
-		local_response.status = "{code} {message}".format(code=status, message=status_message)
-
-		for header, value in event.environment["response"]["headers"].iteritems():
-			local_response.set_header(header, value)
-		local_response.set_header("Content-Type", interpreted_mime_type)
-
-		response_data = self.format_response_data(event)
-
+		event.data = self.format_response_data(event)
 
 class RequestRouter(Actor):
 	def __is_cors(self, event):

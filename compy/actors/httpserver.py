@@ -34,7 +34,7 @@ from gevent.queue import Queue
 
 from compy.actor import Actor
 from compy.errors import InvalidEventDataModification, MalformedEventData, ResourceNotFound
-from compy.event import HttpEvent, JSONHttpEvent, XMLHttpEvent
+from compy.event import HttpEvent, JSONHttpEvent, XMLHttpEvent, response_statuses
 
 BaseRequest.MEMFILE_MAX = 1024 * 1024 # (or whatever you want)
 
@@ -230,30 +230,14 @@ class HTTPServer(Actor, Bottle):
         response_queue = self.responders.pop(event.event_id, None)
 
         if response_queue:
-            accept = event.get('accept', original_event_class.content_type)
-
-            if not isinstance(event, self.CONTENT_TYPE_MAP[accept]):
-                self.logger.warning(
-                    "Incoming event did did not match the clients Accept format. Converting '{current}' to '{new}'".format(
-                        current=type(event), new=original_event_class.__name__))
-                print event
-                event = event.convert(self.CONTENT_TYPE_MAP[accept])
-
             local_response = HTTPResponse()
-            status, status_message = event.status
+            status, status_message = event.status, response_statuses.get(event.status, "")
             local_response.status = "{code} {message}".format(code=status, message=status_message)
 
-            for header, value in event.headers.iteritems():
+            for header, value in event.environment["response"]["headers"].iteritems():
                 local_response.set_header(header, value)
 
-            local_response.set_header("Content-Type", event.content_type)
-
-            if int(status) == 204:
-                response_data = ""
-            else:
-                response_data = self.format_response_data(event)
-
-            local_response.body = response_data
+            local_response.body = event.data
 
             response_queue.put(local_response)
             response_queue.put(StopIteration)
