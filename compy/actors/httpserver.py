@@ -229,8 +229,9 @@ class HTTPServer(Actor, Bottle):
 
         if response_queue:
             local_response = HTTPResponse()
-            status, status_message = event.status, response_statuses.get(event.status, "")
-            local_response.status = "{code} {message}".format(code=status, message=status_message)
+            status_code = event.environment["response"].get("status", 200)
+            status_message = response_statuses.get(status_code, "")
+            local_response.status = "{code} {message}".format(code=status_code, message=status_message)
 
             for header, value in event.environment["response"]["headers"].iteritems():
                 local_response.set_header(header, value)

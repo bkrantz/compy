@@ -4,6 +4,7 @@ from compy.actors.util.xpath import XPathLookup
 import re
 
 __all__ = [
+	"BasicEventModifyMixin",
 	"JSONEventModifyMixin",
 	"XMLEventModifyMixin",
 	"LookupMixin",
@@ -110,6 +111,22 @@ class _EventModifyMixin:
 			join_key=join_key,
 			*args,
 			**kwargs)
+
+class BasicEventModifyMixin:
+	def event_update(self, event, content, key_chain, *args, **kwargs):
+		event.set(key_chain.pop(), content)
+		return event
+
+	def event_join(self, event, content, key_chain, join_key="aggregated", *args, **kwargs):
+		event.set(key_chain.pop(), content)
+		return event
+
+	def event_delete(self, event, content, key_chain, join_key="aggregated", *args, **kwargs):
+		del event[key_chain.pop()]
+
+	def event_replace(self, event, content, key_chain, join_key="aggregated", *args, **kwargs):
+		event.set(key_chain.pop(), content)
+		return event
 
 class JSONEventModifyMixin(_EventModifyMixin):
 	input = JSONEvent
