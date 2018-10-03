@@ -10,10 +10,9 @@ __all__ = [
 	"HeaderController",
 	"CORSController",
 	"RequestInterpretor",
-	"RequestRouter",
+	"ResponseInterpretor",
+	"RequestRouter"
 ]
-
-
 
 class HeaderController(Actor):
 	def __init__(self, name, headers={}, *args, **kwargs):
@@ -132,7 +131,8 @@ class RequestInterpretor(__HTTPInterpretor):
 		event.environment["request"]["interpreted_content_type"] = interpreted_mime_type
 		try:
 			event.data = event.get(data_source, None)
-			event = event.convert(event_class)
+			if not isinstance(event, event_class):
+				event = event.convert(event_class)
 		except (InvalidEventConversion, MalformedEventData) as err:
 			event.error = err
 			self.send_error(event)
@@ -154,24 +154,6 @@ class ResponseInterpretor(__HTTPInterpretor):
 				response_data = event.data_string()
 			else:
 				response_dict = event.data
-				if self.use_response_wrapper and getattr(event, "use_response_wrapper", True):
-					response_dict = {'data': event.data}
-
-				if event.pagination:
-					limit, offset = event._pagination['limit'], event._pagination['offset']
-					results_length = len(event.data)
-					qs = '?limit={limit}&offset={offset}'
-					base_url = '{path}'.format(path=event.environment['PATH_INFO'])
-
-					links = {}
-					links['prev'] = base_url + qs.format(limit=limit, offset=offset)
-
-					if limit <= results_length:
-						new_offset = offset + limit
-						links['next'] = base_url + qs.format(limit=limit, offset=new_offset)
-
-					response_dict.update({'_pagination': links})
-
 				response_data = json.dumps(response_dict)
 
 		return response_data
@@ -182,11 +164,15 @@ class ResponseInterpretor(__HTTPInterpretor):
 		interpreted_mime_type, event_class, _ = self._interpret_mime_type(raw_mime=accept, default_raw_mime=content_type)
 		event.environment["response"]["headers"]["Content-Type"] = interpreted_mime_type
 
-		if not isinstance(event, event_class):
-			self.logger.warning("Incoming event did did not match the clients Accept format. Converting '{current}' to '{new}'".format(current=type(event), new=original_event_class.__name__))
-			event = event.convert(event_class)
-
-		event.data = self.format_response_data(event)
+		try:
+			event.data = self.format_response_data(event)
+			if not isinstance(event, event_class):
+				event = event.convert(event_class)
+		except (InvalidEventConversion, MalformedEventData) as err:
+			event.error = err
+			self.send_error(event)
+		else:
+			self.send_event(event)
 
 class RequestRouter(Actor):
 	def __is_cors(self, event):

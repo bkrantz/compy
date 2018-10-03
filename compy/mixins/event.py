@@ -4,12 +4,168 @@ from compy.actors.util.xpath import XPathLookup
 import re
 
 __all__ = [
+	"_EventConversionMixin",
+	"_XMLEventConversionMixin",
+	"_JSONEventConversionMixin",
+	"_EventFormatMixin",
+	"_XMLEventFormatMixin",
+	"_JSONEventFormatMixin",
 	"BasicEventModifyMixin",
 	"JSONEventModifyMixin",
 	"XMLEventModifyMixin",
 	"LookupMixin",
 	"XPathLookupMixin"
 ]
+class _EventConversionMixin:
+    _XML_TYPES = [etree._Element, etree._ElementTree, etree._XSLTResultTree]
+    _JSON_TYPES = [dict, list, OrderedDict]
+
+    def _set_conversion_methods(self):
+        self.conversion_methods = defaultdict(lambda: lambda data: self.data)
+
+    def convert(self, convert_to, current_event=None):
+        if current_event is None:
+            current_event = self
+        if issubclass(convert_to, current_event.__class__):
+            # Widening conversion
+            new_class = convert_to
+        else:
+            if not issubclass(current_event.__class__, convert_to):
+                # A complex widening conversion
+                bases = tuple([convert_to] + filter(lambda cls: not issubclass(cls, DataFormatInterface) and not issubclass(convert_to, cls), list(self.__class__.__bases__) + [self.__class__]))
+                if len(bases) == 1:
+                    new_class = bases[0]
+                else:
+                    new_class = filter(lambda cls: cls.__bases__ == bases, built_classes)[0]
+            else:
+                # This is an attempted narrowing conversion
+                raise InvalidEventConversion("Narrowing event conversion attempted, this is not allowed <Attempted {old} -> {new}>".format(
+                        old=current_event.__class__, new=convert_to))
+
+        new_class = new_class.__new__(new_class)
+        new_class.__dict__.update(current_event.__dict__)
+        new_class.data = current_event.data
+        return new_class
+
+class _XMLEventConversionMixin(_EventConversionMixin):
+
+    def _set_conversion_methods(self):
+        self.conversion_methods = {str: lambda data: etree.fromstring(data)}
+        self.conversion_methods.update(dict.fromkeys(_XML_TYPES, lambda data: data))
+        self.conversion_methods.update(dict.fromkeys(_JSON_TYPES, lambda data: etree.fromstring(xmltodict.unparse(self.__internal_xmlify(data)).encode('utf-8'))))
+        self.conversion_methods.update({None.__class__: lambda data: etree.fromstring("<root/>")})
+
+    def __internal_xmlify(self, _json):
+        if isinstance(_json, list) or len(_json) > 1:
+            _json = {"jsonified_envelope": _json}
+        _, value = next(_json.iteritems())
+        if isinstance(value, list):
+            _json = {"jsonified_envelope": _json}
+        return _json
+
+class _JSONEventConversionMixin(_EventConversionMixin):
+
+    def _set_conversion_methods(self):
+        self.conversion_methods = {str: lambda data: json.loads(data)}
+        self.conversion_methods.update(dict.fromkeys(_JSON_TYPES, lambda data: json.loads(json.dumps(data, default=self._decimal_default))))
+        self.conversion_methods.update(dict.fromkeys(_XML_TYPES, lambda data: self.__remove_internal_xmlify(xmltodict.parse(etree.tostring(data), expat=expat))))
+        self.conversion_methods.update({None.__class__: lambda data: {}})
+
+    def __remove_internal_xmlify(self, _json):
+        if len(_json) == 1 and isinstance(_json, dict):
+            key, value = next(_json.iteritems())
+            if key == "jsonified_envelope":
+                _json = value
+        return _json
+
+    def _decimal_default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        raise TypeError
+
+class _EventFormatMixin(_EventConversionMixin):
+	 def format_error(self):
+        if self.error:
+            if hasattr(self.error, 'override') and self.error.override:
+                return self.error.override
+            else:
+                messages = self.error.message
+                if not isinstance(messages, list):
+                    messages = [messages]
+                errors = map(lambda _error:
+                             dict(message=str(getattr(_error, "message", _error)), **self.error.__dict__),
+                             messages)
+                return errors
+        else:
+            return None
+
+    def error_string(self):
+        if self.error:
+            return str(self.format_error())
+        else:
+            return None
+
+    def data_string(self):
+        return str(self.data)
+
+class _XMLEventFormatMixin(_XMLEventConversionMixin, _EventFormatMixin):
+
+    def __getstate__(self):
+        state = super(_XMLEventFormatMixin, self).__getstate__()
+        state['_data'] = etree.tostring(self.data)
+        return state
+
+    def data_string(self):
+        return etree.tostring(self.data)
+
+    def format_error(self):
+        errors = super(_XMLFormatInterface, self).format_error()
+        if self.error and self.error.override:
+            try:
+                result = etree.fromstring(errors)
+            except Exception:
+                result = errors
+        elif errors:
+            result = etree.Element("errors")
+            for error in errors:
+                error_element = etree.Element("error")
+                message_element = etree.Element("message")
+                code_element = etree.Element("code")
+                error_element.append(message_element)
+                message_element.text = error['message']
+                if getattr(error, 'code', None) or ('code' in error and error['code']):
+                    code_element.text = error['code']
+                    error_element.append(code_element)
+                result.append(error_element)
+        return result
+
+    def error_string(self):
+        error = self.format_error()
+        if error is not None:
+            try:
+                error = etree.tostring(error, pretty_print=True)
+            except Exception:
+                pass
+        return error
+
+class _JSONEventFormatMixin(_JSONEventConversionMixin, _EventFormatMixin):
+
+    def __getstate__(self):
+        state = super(_JSONFormatInterface, self).__getstate__()
+        state['_data'] = json.dumps(self.data)
+        return state
+
+    def data_string(self):
+        return json.dumps(self.data, default=self._decimal_default)
+
+    def error_string(self):
+        error = self.format_error()
+        if error:
+            try:
+                error = json.dumps(error)
+            except Exception:
+                pass
+        return error
 
 class _EventModifyMixin:
 

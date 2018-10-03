@@ -47,6 +47,9 @@ class InvalidEventDataModification(CompysitionException):
     """**An attempt to modify Event.data to an invalid format for the Event subclass occurred**"""
     pass
 
+class InvalidEventModification(CompysitionException):
+    pass
+
 
 class InvalidActorOutput(CompysitionException):
     """**An Actor sent an event that was not defined as a valid output Event class**"""
