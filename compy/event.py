@@ -11,13 +11,12 @@ from lxml import etree
 from copy import deepcopy
 from datetime import datetime
 from decimal import Decimal
-from collections import OrderedDict, defaultdict
 from xml.parsers import expat
 from xml.sax.saxutils import XMLGenerator
 
-from .errors import (ResourceNotModified, MalformedEventData, InvalidEventDataModification, UnauthorizedEvent,
+from .errors import (ResourceNotModified, MalformedEventData, InvalidEventDataModification, InvalidEventModification,
     ForbiddenEvent, ResourceNotFound, EventCommandNotAllowed, ActorTimeout, ResourceConflict, ResourceGone,
-    UnprocessableEventData, EventRateExceeded, CompysitionException, ServiceUnavailable)
+    UnprocessableEventData, EventRateExceeded, CompysitionException, ServiceUnavailable, UnauthorizedEvent)
 
 from compy.mixins.event import (_EventConversionMixin, _XMLEventConversionMixin, _JSONEventConversionMixin, 
     _EventFormatMixin, _XMLEventFormatMixin, _JSONEventFormatMixin)
@@ -34,7 +33,7 @@ __all__ = [
     "JSONHttpEvent"
 ]
 
-HTTPStatusMap = defaultdict(lambda: {"status": ((500, "Internal Server Error"))},
+HTTPStatusMap = collections.defaultdict(lambda: {"status": ((500, "Internal Server Error"))},
     {
         ResourceNotModified:            {"status": 304},
         MalformedEventData:             {"status": 400},

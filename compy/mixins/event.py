@@ -1,5 +1,5 @@
+import collections
 from lxml import etree
-from compy.event import JSONEvent, XMLEvent
 from compy.actors.util.xpath import XPathLookup
 import re
 
@@ -18,10 +18,10 @@ __all__ = [
 ]
 class _EventConversionMixin:
     _XML_TYPES = [etree._Element, etree._ElementTree, etree._XSLTResultTree]
-    _JSON_TYPES = [dict, list, OrderedDict]
+    _JSON_TYPES = [dict, list, collections.OrderedDict]
 
     def _set_conversion_methods(self):
-        self.conversion_methods = defaultdict(lambda: lambda data: self.data)
+        self.conversion_methods = collections.defaultdict(lambda: lambda data: self.data)
 
     def convert(self, convert_to, current_event=None):
         if current_event is None:
