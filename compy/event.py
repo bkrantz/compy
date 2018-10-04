@@ -22,6 +22,7 @@ from compy.mixins.event import (_EventConversionMixin, _XMLEventConversionMixin,
     _EventFormatMixin, _XMLEventFormatMixin, _JSONEventFormatMixin)
 
 DEFAULT_EVENT_SERVICE = "default"
+DEFAULT_STATUS_CODE = 200
 
 __all__ = [
     "Event",
@@ -33,7 +34,7 @@ __all__ = [
     "JSONHttpEvent"
 ]
 
-HTTPStatusMap = collections.defaultdict(lambda: {"status": ((500, "Internal Server Error"))},
+HTTPStatusMap = collections.defaultdict(lambda: {"status": 500},
     {
         ResourceNotModified:            {"status": 304},
         MalformedEventData:             {"status": 400},
@@ -88,14 +89,15 @@ HTTPStatuses = {
 class _BaseEvent(object):
 
     def __init__(self, meta_id=None, data=None, *args, **kwargs):
+        self._set_service()
+        self._set_conversion_methods()
         self.event_id = uuid().get_hex()
         self.meta_id = meta_id if meta_id else self.event_id
-        self._set_service()
+        self._data = None
         self.data = data
         self.error = None
         self.created = datetime.now()
         self.__dict__.update(kwargs)
-        self._set_conversion_methods()
 
     def _set_service(self):
         self.service = DEFAULT_EVENT_SERVICE
@@ -119,8 +121,7 @@ class _BaseEvent(object):
         try:
             self._data = self.conversion_methods[data.__class__](data)
         except KeyError:
-            raise InvalidEventDataModification("Data of type '{_type}' was not valid for event type {cls}: {err}".format(_type=type(data),
-                                                                                          cls=self.__class__, err=traceback.format_exc()))
+            raise InvalidEventDataModification("Data of type '{_type}' was not valid for event type {cls}: {err}".format(_type=type(data), cls=self.__class__, err=traceback.format_exc()))
         except ValueError as err:
             raise InvalidEventDataModification("Malformed data: {err}".format(err=err))
         except Exception as err:
@@ -141,7 +142,7 @@ class _BaseEvent(object):
         return {k: v for k, v in self.__dict__.iteritems() if k != "data" and k != "_data"}
 
     def __getstate__(self):
-        return dict(self.__dict__)
+        return self._get_state()
 
     def __setstate__(self, state):
         self.__dict__ = state
@@ -169,6 +170,7 @@ class Event(_EventFormatMixin, _BaseEvent):
     pass
     
 class LogEvent(_EventFormatMixin, _BaseEvent):
+    conversion_parents = [Event]
 
     def __init__(self, level, origin_actor, message, id=None, *args, **kwargs):
         super(LogEvent, self).__init__(*args, **kwargs)
@@ -185,16 +187,15 @@ class LogEvent(_EventFormatMixin, _BaseEvent):
             "message":          self.message
         }
 
-class HttpEvent(_EventFormatMixin, _BaseEvent):
-
+class _BaseHttpEvent(_BaseEvent):
     def __init__(self, environment={}, *args, **kwargs):
         self._ensure_environment(environment)
-        super(HttpEvent, self).__init__(*args, **kwargs)
+        super(_BaseHttpEvent, self).__init__(*args, **kwargs)
 
-    def __recursive_update(d, u):
+    def __recursive_update(self, d, u):
         for k, v in u.iteritems():
             if isinstance(v, collections.Mapping):
-                d[k] = update(d.get(k, {}), v)
+                d[k] = self.__recursive_update(d.get(k, {}), v)
             else:
                 d[k] = v
         return d
@@ -219,7 +220,7 @@ class HttpEvent(_EventFormatMixin, _BaseEvent):
                 },
                 "response": {
                     "headers": {},
-                    "status": 200
+                    "status": DEFAULT_STATUS_CODE
                 },
                 "remote": {
                     "address": None,
@@ -240,7 +241,14 @@ class HttpEvent(_EventFormatMixin, _BaseEvent):
 
     @status.setter
     def status(self, status):
-        self.environment["response"]["status"] = status
+        if status is None:
+            status = DEFAULT_STATUS_CODE
+        try:
+            HTTPStatuses[status]
+        except KeyError, AttributeError:
+            raise InvalidEventModification("Unrecognized status code")
+        else:
+            self.environment["response"]["status"] = status
 
     def update_headers(self, headers={}, **kwargs):
         self.environment["response"]["headers"].update(headers)
@@ -249,18 +257,21 @@ class HttpEvent(_EventFormatMixin, _BaseEvent):
     def _set_error(self, exception):
         if exception is not None:
             error_state = HTTPStatusMap[exception.__class__]
-            self.status = error_state.get("status")
+            self.status = error_state.get("status", None)
             self.update_headers(headers=error_state.get("headers", {}))
-        super(HttpEvent, self)._set_error(exception)
+        super(_BaseHttpEvent, self)._set_error(exception)
+
+class HttpEvent(_EventFormatMixin, _BaseHttpEvent):
+    conversion_parents = [Event]
 
 class XMLEvent(_XMLEventFormatMixin, _BaseEvent):
-    pass
+    conversion_parents = [Event]
 
-class XMLHttpEvent(_XMLEventFormatMixin, HttpEvent):
-    pass
+class XMLHttpEvent(_XMLEventFormatMixin, _BaseHttpEvent):
+    conversion_parents = [Event, HttpEvent]
 
 class JSONEvent(_JSONEventFormatMixin, _BaseEvent):
-    pass
+    conversion_parents = [Event]
 
-class JSONHttpEvent(_JSONEventFormatMixin, HttpEvent):
-    pass
+class JSONHttpEvent(_JSONEventFormatMixin, _BaseHttpEvent):
+    conversion_parents = [Event, HttpEvent]

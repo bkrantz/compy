@@ -3,8 +3,8 @@ from bottle import *
 from collections import defaultdict
 
 from compy.actor import Actor
-from compy.errors import InvalidEventDataModification, MalformedEventData, ResourceNotFound
-from compy.event import HttpEvent, JSONHttpEvent, XMLHttpEvent, response_statuses
+from compy.errors import InvalidEventConversion, InvalidEventDataModification, MalformedEventData, ResourceNotFound
+from compy.event import HttpEvent, JSONHttpEvent, XMLHttpEvent
 
 __all__ = [
 	"HeaderController",
@@ -125,19 +125,26 @@ class __HTTPInterpretor(Actor):
 		return converted_type, event_class, data_source
 
 class RequestInterpretor(__HTTPInterpretor):
-	def consume(self, event):
+	def consume(self, event, *args, **kwargs):
 		raw_mime_type = event.environment["request"]["headers"].get("Content-Type", "").split(';')[0]
 		interpreted_mime_type, event_class, data_source = self._interpret_mime_type(raw_mime=raw_mime_type)
 		event.environment["request"]["interpreted_content_type"] = interpreted_mime_type
 		try:
-			event.data = event.get(data_source, None)
+			self.logger.info("1")
 			if not isinstance(event, event_class):
 				event = event.convert(event_class)
+			event.data = event.get(data_source, None)
+			self.logger.info(event.data)
+			self.logger.info("2")
 		except (InvalidEventConversion, MalformedEventData) as err:
 			event.error = err
+			self.logger.info("3")
 			self.send_error(event)
+			self.logger.info("3")
 		else:
+			self.logger.info("4")
 			self.send_event(event)
+			self.logger.info("4")
 
 class ResponseInterpretor(__HTTPInterpretor):
 	def format_response_data(self, event):
@@ -158,7 +165,7 @@ class ResponseInterpretor(__HTTPInterpretor):
 
 		return response_data
 
-	def consume(self, event):
+	def consume(self, event, *args, **kwargs):
 		accept = event.environment["request"]["headers"].get("Accept", "").split(";")[0]
 		content_type = event.environment["request"].get("interpreted_content_type", None)
 		interpreted_mime_type, event_class, _ = self._interpret_mime_type(raw_mime=accept, default_raw_mime=content_type)
@@ -183,7 +190,7 @@ class RequestRouter(Actor):
 			return True
 		return False
 
-	def consume(self, event):
+	def consume(self, event, *args, **kwargs):
 		queue_name = event.environment["path_args"].get("queue", None) or self.name
 		queue = self.pool.outbound.get(queue_name, None)
 		if not queue:

@@ -200,16 +200,17 @@ class Actor(object):
         :param queues:
         :return:
         """
-        if check_output and not isinstance(event, self.output):
+
+        isInstance = event.isInstance(convert_to=self.output[0])
+        if check_output and not isInstance:
             raise_error = True
             if self.convert_output:
                 raise_error = False
                 try:
-                    if not isinstance(event, self.output):
-                        new_event = event.convert(self.output[0])
-                        self.logger.warning("Outgoing event was of type '{_type}' when type {output} was expected. Converted to {converted}".format(
-                            _type=type(event), output=self.output, converted=type(new_event)), event=event)
-                        event = new_event
+                    new_event = event.convert(self.output[0])
+                    self.logger.warning("Outgoing event was of type '{_type}' when type {output} was expected. Converted to {converted}".format(
+                        _type=type(event), output=self.output, converted=type(new_event)), event=event)
+                    event = new_event
                 except InvalidEventConversion:
                     raise_error = True
             if raise_error:
@@ -265,8 +266,11 @@ class Actor(object):
         This function actually calls the consume function for the actor
         """
         try:
+            isInstance = False
+            for inClazz in self.input:
+                isInstance = isInstance or event.isInstance(convert_to=inClazz)
 
-            if not isinstance(event, self.input):
+            if not isInstance:
                 new_event = event.convert(self.input[0])
                 self.logger.warning("Incoming event was of type '{_type}' when type {input} was expected. Converted to {converted}".format(
                     _type=type(event), input=self.input, converted=type(new_event)), event=event)

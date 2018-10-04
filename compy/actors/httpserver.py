@@ -34,7 +34,7 @@ from gevent.queue import Queue
 
 from compy.actor import Actor
 from compy.errors import InvalidEventDataModification, MalformedEventData, ResourceNotFound
-from compy.event import HttpEvent, JSONHttpEvent, XMLHttpEvent, response_statuses
+from compy.event import HttpEvent, JSONHttpEvent, XMLHttpEvent, HTTPStatuses
 
 BaseRequest.MEMFILE_MAX = 1024 * 1024 # (or whatever you want)
 
@@ -230,7 +230,7 @@ class HTTPServer(Actor, Bottle):
         if response_queue:
             local_response = HTTPResponse()
             status_code = event.environment["response"].get("status", 200)
-            status_message = response_statuses.get(status_code, "")
+            status_message = HTTPStatuses.get(status_code, "")
             local_response.status = "{code} {message}".format(code=status_code, message=status_message)
 
             for header, value in event.environment["response"]["headers"].iteritems():
@@ -286,9 +286,7 @@ class HTTPServer(Actor, Bottle):
         response_queue = Queue()
         self.responders.update({event.event_id: response_queue})
         self.logger.info("Received {0} request for service {1}".format(request.method, queue or self.name), event=event)
-
         self.send_event(event)
-
         return response_queue
 
     def post_hook(self):

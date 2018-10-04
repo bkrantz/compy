@@ -2,6 +2,7 @@ import collections
 from lxml import etree
 from compy.actors.util.xpath import XPathLookup
 import re
+from compy.errors import InvalidEventConversion
 
 __all__ = [
     "_EventConversionMixin",
@@ -21,30 +22,24 @@ class _EventConversionMixin:
     _JSON_TYPES = [dict, list, collections.OrderedDict]
 
     def _set_conversion_methods(self):
-        self.conversion_methods = collections.defaultdict(lambda: lambda data: self.data)
+        self.conversion_methods = collections.defaultdict(lambda: lambda data: data)
+
+    def isInstance(self, convert_to, current_event=None):
+        if current_event is None:
+            current_event = self
+        return convert_to in current_event.conversion_parents or convert_to == current_event.__class__
 
     def convert(self, convert_to, current_event=None):
         if current_event is None:
             current_event = self
-        if issubclass(convert_to, current_event.__class__):
-            # Widening conversion
-            new_class = convert_to
-        else:
-            if not issubclass(current_event.__class__, convert_to):
-                # A complex widening conversion
-                bases = tuple([convert_to] + filter(lambda cls: not issubclass(cls, DataFormatInterface) and not issubclass(convert_to, cls), list(self.__class__.__bases__) + [self.__class__]))
-                if len(bases) == 1:
-                    new_class = bases[0]
-                else:
-                    new_class = filter(lambda cls: cls.__bases__ == bases, built_classes)[0]
-            else:
-                # This is an attempted narrowing conversion
-                raise InvalidEventConversion("Narrowing event conversion attempted, this is not allowed <Attempted {old} -> {new}>".format(
-                        old=current_event.__class__, new=convert_to))
-
-        new_class = new_class.__new__(new_class)
-        new_class.__dict__.update(current_event.__dict__)
-        new_class.data = current_event.data
+        try:
+            if self.isInstance(convert_to=convert_to, current_event=current_event):
+                return current_event
+            new_class = convert_to.__new__(convert_to)
+            new_class.__dict__.update(current_event.__dict__)
+            new_class.data = current_event.data
+        except Exception as err:
+            raise InvalidEventConversion("Unable to convert event. <Attempted {old} -> {new}>".format(old=current_event.__class__, new=convert_to))
         return new_class
 
 class _XMLEventConversionMixin(_EventConversionMixin):
@@ -84,6 +79,10 @@ class _JSONEventConversionMixin(_EventConversionMixin):
         raise TypeError
 
 class _EventFormatMixin(_EventConversionMixin):
+    
+    def _get_state(self):
+        return dict(self.__dict__)
+
     def format_error(self):
         if self.error:
             if hasattr(self.error, 'override') and self.error.override:
@@ -110,13 +109,17 @@ class _EventFormatMixin(_EventConversionMixin):
 
 class _XMLEventFormatMixin(_XMLEventConversionMixin, _EventFormatMixin):
 
-    def __getstate__(self):
-        state = super(_XMLEventFormatMixin, self).__getstate__()
-        state['_data'] = etree.tostring(self.data)
+    def _get_state(self):
+        state = _EventFormatMixin._get_state(self)
+        if self.data is not None:
+            state['_data'] = etree.tostring(self.data)
         return state
 
     def data_string(self):
-        return etree.tostring(self.data)
+        try:
+            return etree.tostring(self.data)
+        except TypeError:
+            return None
 
     def format_error(self):
         errors = super(_XMLFormatInterface, self).format_error()
@@ -150,9 +153,10 @@ class _XMLEventFormatMixin(_XMLEventConversionMixin, _EventFormatMixin):
 
 class _JSONEventFormatMixin(_JSONEventConversionMixin, _EventFormatMixin):
 
-    def __getstate__(self):
-        state = super(_JSONFormatInterface, self).__getstate__()
-        state['_data'] = json.dumps(self.data)
+    def _get_state(self):
+        state = _EventFormatMixin._get_state(self)
+        if self.data is not None:
+            state['_data'] = json.dumps(self.data)
         return state
 
     def data_string(self):
