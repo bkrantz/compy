@@ -1,18 +1,11 @@
 #!/usr/bin/env python
 
-import json
-import traceback
-import re
-import xmltodict
-import collections
 
+import traceback
+import collections
 from uuid import uuid4 as uuid
-from lxml import etree
 from copy import deepcopy
 from datetime import datetime
-from decimal import Decimal
-from xml.parsers import expat
-from xml.sax.saxutils import XMLGenerator
 
 from .errors import (ResourceNotModified, MalformedEventData, InvalidEventDataModification, InvalidEventModification,
     ForbiddenEvent, ResourceNotFound, EventCommandNotAllowed, ActorTimeout, ResourceConflict, ResourceGone,
@@ -21,7 +14,7 @@ from .errors import (ResourceNotModified, MalformedEventData, InvalidEventDataMo
 from compy.mixins.event import (_EventConversionMixin, _XMLEventConversionMixin, _JSONEventConversionMixin, 
     _EventFormatMixin, _XMLEventFormatMixin, _JSONEventFormatMixin)
 
-DEFAULT_EVENT_SERVICE = "default"
+DEFAULT_SERVICE = "default"
 DEFAULT_STATUS_CODE = 200
 
 __all__ = [
@@ -88,9 +81,8 @@ HTTPStatuses = {
 
 class _BaseEvent(object):
 
-    def __init__(self, meta_id=None, data=None, *args, **kwargs):
-        self._set_service()
-        self._set_conversion_methods()
+    def __init__(self, meta_id=None, data=None, service=None, *args, **kwargs):
+        self.service = service
         self.event_id = uuid().get_hex()
         self.meta_id = meta_id if meta_id else self.event_id
         self._data = None
@@ -98,9 +90,6 @@ class _BaseEvent(object):
         self.error = None
         self.created = datetime.now()
         self.__dict__.update(kwargs)
-
-    def _set_service(self):
-        self.service = DEFAULT_EVENT_SERVICE
 
     def set(self, key, value):
         try:
@@ -111,6 +100,19 @@ class _BaseEvent(object):
 
     def get(self, key, default=None):
         return getattr(self, key, default)
+
+    @property
+    def service(self):
+        return self._service
+
+    @service.setter
+    def service(self, service):
+        self._set_service(service)
+
+    def _set_service(self, service):
+        self._service = service
+        if self._service == None:
+            self._service = DEFAULT_SERVICE
 
     @property
     def data(self):
@@ -146,7 +148,7 @@ class _BaseEvent(object):
 
     def __setstate__(self, state):
         self.__dict__ = state
-        self.data = state['_data']
+        self.data = state.get('_data', None)
         self.error = state.get('_error', None)
 
     def __str__(self):
@@ -166,14 +168,9 @@ class _BaseEvent(object):
     def clone(self):
         return deepcopy(self)
 
-class Event(_EventFormatMixin, _BaseEvent):
-    pass
-    
-class LogEvent(_EventFormatMixin, _BaseEvent):
-    conversion_parents = [Event]
-
+class _BaseLogEvent(_BaseEvent):
     def __init__(self, level, origin_actor, message, id=None, *args, **kwargs):
-        super(LogEvent, self).__init__(*args, **kwargs)
+        super(_BaseLogEvent, self).__init__(*args, **kwargs)
         self.id = id
         self.level = level
         self.time = datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
@@ -200,8 +197,10 @@ class _BaseHttpEvent(_BaseEvent):
                 d[k] = v
         return d
 
-    def _set_service(self):
-        self.service = self.environment["request"]["url"]["path_args"].get("queue", DEFAULT_EVENT_SERVICE)
+    def _set_service(self, service):
+        if service is None:
+            service = self.environment["request"]["url"]["path_args"].get("queue", None)
+        super(_BaseHttpEvent, self)._set_service(service=service)
 
     def _ensure_environment(self, environment):
         if self.get("environment", None) is None:
@@ -260,6 +259,12 @@ class _BaseHttpEvent(_BaseEvent):
             self.status = error_state.get("status", None)
             self.update_headers(headers=error_state.get("headers", {}))
         super(_BaseHttpEvent, self)._set_error(exception)
+
+class Event(_EventFormatMixin, _BaseEvent):
+    conversion_parents = []
+
+class LogEvent(_EventFormatMixin, _BaseLogEvent):
+    conversion_parents = [Event]
 
 class HttpEvent(_EventFormatMixin, _BaseHttpEvent):
     conversion_parents = [Event]

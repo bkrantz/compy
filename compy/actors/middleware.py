@@ -1,6 +1,7 @@
 import mimeparse
 from bottle import *
 from collections import defaultdict
+import json
 
 from compy.actor import Actor
 from compy.errors import InvalidEventConversion, InvalidEventDataModification, MalformedEventData, ResourceNotFound
@@ -34,15 +35,10 @@ class CORSController(Actor):
 		self.clear_data = clear_data
 
 	def consume(self, event, *args, **kwargs):
-		origin = event.environment.get("HTTP_ORIGIN")
-		method = event.environment.get("HTTP_ACCESS_CONTROL_REQUEST_METHOD", None)
-		headers = event.environment.get("HTTP_ACCESS_CONTROL_REQUEST_HEADERS", None)
-		
 		origin = event.environment["request"]["headers"].get("Origin", None)
 		method = event.environment["request"]["headers"].get("Access-Control-Request-Method", None)
 		headers = event.environment["request"]["headers"].get("Access-Control-Request-Headers", None)
 		
-
 		new_headers = {}
 		if len(self.origins) == 0 or origin in self.origins:
 			new_headers["Access-Control-Allow-Origin"] = origin
@@ -59,13 +55,12 @@ class CORSController(Actor):
 			else:
 				new_headers["Access-Control-Allow-Headers"] = ",".join(self.headers)
 
-		current_headers = event.get("headers", {})
+		current_headers = event.environment["response"].get("headers", {})
 		current_headers.update(new_headers)
-		event.set('headers', current_headers)
+		event.environment["response"]['headers'] = current_headers
 		if self.clear_data:
 			event._data = None
 		self.send_event(event)
-
 
 class __HTTPInterpretor(Actor):
 	DEFAULT_DATA_SOURCE = "data"
@@ -103,6 +98,7 @@ class __HTTPInterpretor(Actor):
 			"plain":{}
 		}
 	}
+
 	CONTENT_TYPES = ["%s/%s" % (main_type, sub_type) for main_type in MIME_TYPES.iterkeys() for sub_type in MIME_TYPES[main_type].iterkeys() ]
 
 	def _interpret_mime_type(self, raw_mime, default_raw_mime=None):
@@ -130,26 +126,21 @@ class RequestInterpretor(__HTTPInterpretor):
 		interpreted_mime_type, event_class, data_source = self._interpret_mime_type(raw_mime=raw_mime_type)
 		event.environment["request"]["interpreted_content_type"] = interpreted_mime_type
 		try:
-			self.logger.info("1")
+			event.data = event.get(data_source, None)
 			if not isinstance(event, event_class):
 				event = event.convert(event_class)
-			event.data = event.get(data_source, None)
-			self.logger.info(event.data)
-			self.logger.info("2")
 		except (InvalidEventConversion, MalformedEventData) as err:
+			self.logger.error("Unable to Interpret Request: %s" % err)
 			event.error = err
-			self.logger.info("3")
 			self.send_error(event)
-			self.logger.info("3")
 		else:
-			self.logger.info("4")
+			self.logger.info("Interpreted Request's Content-Type '%s' AS '%s': Using event class '%s'" % (raw_mime_type, interpreted_mime_type, event_class.__name__))
 			self.send_event(event)
-			self.logger.info("4")
 
 class ResponseInterpretor(__HTTPInterpretor):
 	def format_response_data(self, event):
 		if event.error:
-			if isinstance(event, JSONEvent):
+			if event.isInstance(JSONEvent):
 				response_data = json.dumps({"errors": event.format_error()})
 			else:
 				response_data = event.error_string()
@@ -172,16 +163,16 @@ class ResponseInterpretor(__HTTPInterpretor):
 		event.environment["response"]["headers"]["Content-Type"] = interpreted_mime_type
 
 		try:
-			event.data = self.format_response_data(event)
-			if not isinstance(event, event_class):
+			if not event.isInstance(event_class):
 				event = event.convert(event_class)
+			event.data = self.format_response_data(event)
 		except (InvalidEventConversion, MalformedEventData) as err:
 			event.error = err
 			self.send_error(event)
 		else:
 			self.send_event(event)
 
-class RequestRouter(Actor):
+class ServiceRouter(Actor):
 	def __is_cors(self, event):
 		origin = event.environment["request"]["headers"].get("Origin", None)
 		cur_method = event.environment["request"]["method"]
@@ -191,13 +182,12 @@ class RequestRouter(Actor):
 		return False
 
 	def consume(self, event, *args, **kwargs):
-		queue_name = event.environment["path_args"].get("queue", None) or self.name
+		queue_name = event.service or self.name
 		queue = self.pool.outbound.get(queue_name, None)
-		if not queue:
+		if self.__is_cors(event=event):
+			queue = self.pool.outbound.get("cors", queue)
+		if queue is None:
 			self.logger.error("Queue name '{queue_name}' was not found".format(queue_name=queue_name))
 			self.send_error(event)
 		else:
-			if self.__is_cors(event=event):
-				cors_queue = self.pool.outbound.get("cors", None)
-				queue = cors_queue if cors_queue is not None else queue
 			self.send_event(event, queues=[queue])

@@ -1,8 +1,12 @@
-import collections
+import xmltodict
 from lxml import etree
+from decimal import Decimal
+import collections
 from compy.actors.util.xpath import XPathLookup
-import re
 from compy.errors import InvalidEventConversion
+import json
+import re
+from xml.parsers import expat
 
 __all__ = [
     "_EventConversionMixin",
@@ -17,12 +21,58 @@ __all__ = [
     "LookupMixin",
     "XPathLookupMixin"
 ]
-class _EventConversionMixin:
+
+class _ConversionMethods:
     _XML_TYPES = [etree._Element, etree._ElementTree, etree._XSLTResultTree]
     _JSON_TYPES = [dict, list, collections.OrderedDict]
 
-    def _set_conversion_methods(self):
-        self.conversion_methods = collections.defaultdict(lambda: lambda data: data)
+    def get_conversion_methods(self, conv_type=None):
+        if conv_type == "XML":
+            conversion_methods = {str: lambda data: etree.fromstring(data)}
+            conversion_methods.update(dict.fromkeys(self._XML_TYPES, lambda data: data))
+            conversion_methods.update(dict.fromkeys(self._JSON_TYPES, lambda data: etree.fromstring(xmltodict.unparse(self.__internal_xmlify(data)).encode('utf-8'))))
+            conversion_methods.update({None.__class__: lambda data: etree.fromstring("<root/>")})
+            return conversion_methods
+        elif conv_type == "JSON":
+            conversion_methods = {str: lambda data: json.loads(data)}
+            conversion_methods.update(dict.fromkeys(self._JSON_TYPES, lambda data: json.loads(json.dumps(data, default=self.decimal_default))))
+            conversion_methods.update(dict.fromkeys(self._XML_TYPES, lambda data: self.__remove_internal_xmlify(xmltodict.parse(etree.tostring(data), expat=expat))))
+            conversion_methods.update({None.__class__: lambda data: {}})
+            return conversion_methods
+        else:
+            return collections.defaultdict(lambda: lambda data: data)
+
+    def __internal_xmlify(self, _json):
+        if isinstance(_json, list) or len(_json) > 1:
+            _json = {"jsonified_envelope": _json}
+        _, value = next(_json.iteritems())
+        if isinstance(value, list):
+            _json = {"jsonified_envelope": _json}
+        return _json
+
+    def __remove_internal_xmlify(self, _json):
+        if len(_json) == 1 and isinstance(_json, dict):
+            key, value = next(_json.iteritems())
+            if key == "jsonified_envelope":
+                _json = value
+        return _json
+
+    def decimal_default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        raise TypeError
+
+__conversion_methods_obj = None
+
+def _getConversionMethods():
+    global __conversion_methods_obj
+    if __conversion_methods_obj is None:
+        __conversion_methods_obj = _ConversionMethods()
+    return __conversion_methods_obj
+
+class _EventConversionMixin:
+
+    conversion_methods = _getConversionMethods().get_conversion_methods()
 
     def isInstance(self, convert_to, current_event=None):
         if current_event is None:
@@ -43,40 +93,10 @@ class _EventConversionMixin:
         return new_class
 
 class _XMLEventConversionMixin(_EventConversionMixin):
-
-    def _set_conversion_methods(self):
-        self.conversion_methods = {str: lambda data: etree.fromstring(data)}
-        self.conversion_methods.update(dict.fromkeys(_XML_TYPES, lambda data: data))
-        self.conversion_methods.update(dict.fromkeys(_JSON_TYPES, lambda data: etree.fromstring(xmltodict.unparse(self.__internal_xmlify(data)).encode('utf-8'))))
-        self.conversion_methods.update({None.__class__: lambda data: etree.fromstring("<root/>")})
-
-    def __internal_xmlify(self, _json):
-        if isinstance(_json, list) or len(_json) > 1:
-            _json = {"jsonified_envelope": _json}
-        _, value = next(_json.iteritems())
-        if isinstance(value, list):
-            _json = {"jsonified_envelope": _json}
-        return _json
+    conversion_methods = _getConversionMethods().get_conversion_methods("XML")
 
 class _JSONEventConversionMixin(_EventConversionMixin):
-
-    def _set_conversion_methods(self):
-        self.conversion_methods = {str: lambda data: json.loads(data)}
-        self.conversion_methods.update(dict.fromkeys(_JSON_TYPES, lambda data: json.loads(json.dumps(data, default=self._decimal_default))))
-        self.conversion_methods.update(dict.fromkeys(_XML_TYPES, lambda data: self.__remove_internal_xmlify(xmltodict.parse(etree.tostring(data), expat=expat))))
-        self.conversion_methods.update({None.__class__: lambda data: {}})
-
-    def __remove_internal_xmlify(self, _json):
-        if len(_json) == 1 and isinstance(_json, dict):
-            key, value = next(_json.iteritems())
-            if key == "jsonified_envelope":
-                _json = value
-        return _json
-
-    def _decimal_default(self, obj):
-        if isinstance(obj, Decimal):
-            return float(obj)
-        raise TypeError
+    conversion_methods = _getConversionMethods().get_conversion_methods("JSON")
 
 class _EventFormatMixin(_EventConversionMixin):
     
@@ -91,9 +111,7 @@ class _EventFormatMixin(_EventConversionMixin):
                 messages = self.error.message
                 if not isinstance(messages, list):
                     messages = [messages]
-                errors = map(lambda _error:
-                             dict(message=str(getattr(_error, "message", _error)), **self.error.__dict__),
-                             messages)
+                errors = map(lambda _error: dict(message=str(getattr(_error, "message", _error)), **self.error.__dict__), messages)
                 return errors
         else:
             return None
@@ -160,7 +178,7 @@ class _JSONEventFormatMixin(_JSONEventConversionMixin, _EventFormatMixin):
         return state
 
     def data_string(self):
-        return json.dumps(self.data, default=self._decimal_default)
+        return json.dumps(self.data, default=_getConversionMethods().decimal_default)
 
     def error_string(self):
         error = self.format_error()

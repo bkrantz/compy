@@ -33,7 +33,6 @@ class _BaseEventModifier(_ModifyMixin, Actor):
                     raise CompysitionException(self._internal_error_message)
             else:
                 self.logger.error("Ambiguous source value {value}, unable to make changes to event.{key}".format(key='.'.join(definition.target_scope), value=definition.value), event=event)
-                print source_values
                 raise CompysitionException(self._internal_error_message)
             try:
                 join_key = getattr(definition, "join_key", None)

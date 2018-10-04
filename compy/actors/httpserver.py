@@ -1,25 +1,4 @@
 #!/usr/bin/env python
-#
-# -*- coding: utf-8 -*-
-#
-#  wsgi.py
-#
-#  Copyright 2014 James Hulett <james.hulett@cuanswers.com>
-#
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 3 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
 
 import json
 import mimeparse
@@ -236,7 +215,7 @@ class HTTPServer(Actor, Bottle):
             for header, value in event.environment["response"]["headers"].iteritems():
                 local_response.set_header(header, value)
 
-            local_response.body = event.data
+            local_response.body = event.data_string()
 
             response_queue.put(local_response)
             response_queue.put(StopIteration)
@@ -257,10 +236,6 @@ class HTTPServer(Actor, Bottle):
                     "path_args": {key: value for key, value in environ["route.url_args"].iteritems()},
                     "query_args": {key: value for key, value in environ["bottle.request"].query.iteritems()}
                 }
-            },
-            "response": {
-                "headers": {},
-                "status": 200
             },
             "remote": {
                 "address": environ["REMOTE_ADDR"],
