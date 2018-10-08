@@ -1,5 +1,5 @@
-
-from compy.mixins.event import JSONEventModifyMixin, XMLEventModifyMixin, LookupMixin, XPathLookupMixin
+from compy.actors.mixins.event import JSONEventModifyMixin, XMLEventModifyMixin, LookupMixin, XPathLookupMixin
+import json
 
 __all__ = [
 	"_DatabaseMixin",
@@ -72,16 +72,31 @@ class _XMLDatabaseMixin(XMLEventModifyMixin, _DatabaseMixin, XPathLookupMixin):
 		return root
 
 class _JSONDatabaseMixin(JSONEventModifyMixin, _DatabaseMixin, LookupMixin):
-	def _get_dynamic_params(self, event):
-		dynamic_scope = self.lookup(obj=event, key_chain=self.param_scope)
+
+	def __interpret_single(self, dict):
 		params = {}
-		for key in dynamic_scope.iterkeys():
-			value = dynamic_scope[key]
+		for key, value in dict.iteritems():
+			params[key] = str(value)
+			'''
 			try:
 				params[key] = json.dumps(value)
-			except Exception:
+			except AttributeError, ValueError:
 				params[key] = str(value)
-		return [params]
+			'''
+		return params
+
+	def _get_dynamic_params(self, event):
+		param_groups = []
+		dynamic_scope = self.lookup(obj=event, key_chain=self.param_scope)
+		try:
+			param_groups.append(self.__interpret_single(dynamic_scope))
+		except AttributeError:
+			try:
+				for child in dynamic_scope:
+					param_groups.append(self.__interpret_single(child))
+			except TypeError:
+				pass
+		return param_groups
 
 	def _format_results(self, event, results):
 		return {self.records_key:[result for result in results if result]}

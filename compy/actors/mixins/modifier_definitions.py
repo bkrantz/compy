@@ -1,3 +1,5 @@
+from compy.actors.mixins.event import LookupMixin, XPathLookupMixin
+
 _lookup_mixin = None
 _xpath_lookup_mixin = None
 

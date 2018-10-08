@@ -1,8 +1,9 @@
 from compy.actor import Actor
-from compy.mixins.event import BasicEventModifyMixin, JSONEventModifyMixin, XMLEventModifyMixin, LookupMixin, XPathLookupMixin
-from compy.mixins.modifiers import _ModifyMixin
+from compy.actors.mixins.event import BasicEventModifyMixin, JSONEventModifyMixin, XMLEventModifyMixin, LookupMixin, XPathLookupMixin
+from compy.actors.mixins.modifiers import _ModifyMixin
 from compy.errors import MalformedEventData, CompysitionException
 from compy.event import JSONEvent, XMLEvent
+
 __all__ = [
     "BasicEventUpdater",
     "XMLEventUpdater",
@@ -48,5 +49,5 @@ class XMLEventUpdater(XMLEventModifyMixin, _BaseEventModifier):
 class JSONEventUpdater(JSONEventModifyMixin, _BaseEventModifier):
     input = JSONEvent
 
-class BasicEventUpdater(BasicEventModifyMixin, _BaseEventModifier):
+class BasicEventUpdater(JSONEventModifyMixin, _BaseEventModifier):
     pass

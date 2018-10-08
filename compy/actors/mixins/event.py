@@ -79,11 +79,11 @@ class _EventConversionMixin:
             current_event = self
         return convert_to in current_event.conversion_parents or convert_to == current_event.__class__
 
-    def convert(self, convert_to, current_event=None):
+    def convert(self, convert_to, current_event=None, force=False):
         if current_event is None:
             current_event = self
         try:
-            if self.isInstance(convert_to=convert_to, current_event=current_event):
+            if not force and self.isInstance(convert_to=convert_to, current_event=current_event):
                 return current_event
             new_class = convert_to.__new__(convert_to)
             new_class.__dict__.update(current_event.__dict__)
@@ -328,7 +328,16 @@ class JSONEventModifyMixin(_EventModifyMixin):
                     raise KeyError
                 next_step = current_step[current_key]
             except KeyError:
-                finished_content, next_step, current_step = process_func(current_step=current_step, content=content, current_key=current_key, key_chain=key_chain, finished_content=finished_content, *args, **kwargs)
+                local_steps = []
+                try:
+                    current_step[current_key]
+                    raise Exception
+                except TypeError:
+                    local_steps.extend(current_step)
+                except Exception:
+                    local_steps.append(current_step)
+                for local_step in local_steps:
+                    finished_content, next_step, current_step = process_func(current_step=local_step, content=content, current_key=current_key, key_chain=key_chain, finished_content=finished_content, *args, **kwargs)
             new_current_steps.append(next_step)
         return finished_content, new_current_steps
 

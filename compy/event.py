@@ -7,11 +7,11 @@ from uuid import uuid4 as uuid
 from copy import deepcopy
 from datetime import datetime
 
-from .errors import (ResourceNotModified, MalformedEventData, InvalidEventDataModification, InvalidEventModification,
+from compy.errors import (ResourceNotModified, MalformedEventData, InvalidEventDataModification, InvalidEventModification,
     ForbiddenEvent, ResourceNotFound, EventCommandNotAllowed, ActorTimeout, ResourceConflict, ResourceGone,
     UnprocessableEventData, EventRateExceeded, CompysitionException, ServiceUnavailable, UnauthorizedEvent)
 
-from compy.mixins.event import (_EventConversionMixin, _XMLEventConversionMixin, _JSONEventConversionMixin, 
+from compy.actors.mixins.event import (_EventConversionMixin, _XMLEventConversionMixin, _JSONEventConversionMixin, 
     _EventFormatMixin, _XMLEventFormatMixin, _JSONEventFormatMixin)
 
 DEFAULT_SERVICE = "default"

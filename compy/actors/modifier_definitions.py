@@ -1,10 +1,12 @@
+from compy.actors.mixins.modifier_definitions import _get_lookup_mixin, _get_xpath_lookup_mixin
 
 __all__ = [
-	"StaticModifyDefinition",
+    "StaticModifyDefinition",
     "LookupModifyDefinition",
     "XPathLookupModifyDefinition",
     "StaticDeleteDefinition",
-    "XPathLookupDeleteDefinition"
+    "XPathLookupDeleteDefinition",
+    "LookupItemMapDefinition"
 ]
 
 class _BaseModifyDefinition(object):
@@ -15,6 +17,10 @@ class _BaseModifyDefinition(object):
         "delete": 1
     }
 
+    @property
+    def target_scopes(self):
+        return [self.target_scope]
+    
     @property
     def max_values(self):
         return self._max_values[self.output_mode]
@@ -81,6 +87,26 @@ class LookupModifyDefinition(_BaseAddDefinition):
 
     def get_source_values(self, event):
         return [_get_lookup_mixin().lookup(obj=event, key_chain=self.source_scope)]
+
+class LookupItemMapDefinition(_BaseAddDefinition):
+    def __init__(self,
+            key_name="key",
+            value_name="value",
+            source_scope=["_data"],
+            *args,
+            **kwargs):
+        super(LookupItemMapDefinition, self).__init__(*args, **kwargs)
+        self.source_scope = source_scope
+        self.key_name = key_name
+        self.value_name = value_name
+
+    @property
+    def value(self):
+        return self.source_scope
+
+    def get_source_values(self, event):
+        root = _get_lookup_mixin().lookup(obj=event, key_chain=self.source_scope)
+        return [ [ { self.key_name: key, self.value_name: value } for key, value in root.iteritems() ] ]
 
 class XPathLookupModifyDefinition(LookupModifyDefinition):
     def get_source_values(self, event):

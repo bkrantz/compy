@@ -49,9 +49,9 @@ class _BasicAuthDatabaseMixin:
         target_methods = ["GET", "POST", "PUT", "DELETE"]
         for result in results:
             try:
-                assert re.match(result["remote_address_regex"], event.environment.get("REMOTE_ADDR", ""))
-                assert re.match(result["path_regex"], event.environment.get("PATH_INFO", ""))
-                request_method = event.environment.get("REQUEST_METHOD", "")
+                assert re.match(result["remote_address_regex"], event.environment["remote"].get("address", ""))
+                assert re.match(result["path_regex"], event.environment["request"]["url"].get("path", ""))
+                request_method = event.environment["request"].get("method", "")
                 for method in target_methods:
                     assert result[method] if request_method == method else True
                 assert result["other"] if request_method not in target_methods else True

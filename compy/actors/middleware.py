@@ -5,7 +5,7 @@ import json
 
 from compy.actor import Actor
 from compy.errors import InvalidEventConversion, InvalidEventDataModification, MalformedEventData, ResourceNotFound
-from compy.event import HttpEvent, JSONHttpEvent, XMLHttpEvent
+from compy.event import HttpEvent, JSONHttpEvent, XMLHttpEvent, JSONEvent
 
 __all__ = [
 	"HeaderController",
@@ -140,11 +140,12 @@ class RequestInterpretor(__HTTPInterpretor):
 class ResponseInterpretor(__HTTPInterpretor):
 	def format_response_data(self, event):
 		if event.error:
-			if event.isInstance(JSONEvent):
+			if isinstance(event.data, (list, dict, str)):
 				response_data = json.dumps({"errors": event.format_error()})
 			else:
 				response_data = event.error_string()
 		else:
+			response_data = event.data_string()
 			if not isinstance(event.data, (list, dict, str)) or \
 					(isinstance(event.data, dict) and \
 						len(event.data) == 1 and \
@@ -153,7 +154,6 @@ class ResponseInterpretor(__HTTPInterpretor):
 			else:
 				response_dict = event.data
 				response_data = json.dumps(response_dict)
-
 		return response_data
 
 	def consume(self, event, *args, **kwargs):
@@ -161,16 +161,18 @@ class ResponseInterpretor(__HTTPInterpretor):
 		content_type = event.environment["request"].get("interpreted_content_type", None)
 		interpreted_mime_type, event_class, _ = self._interpret_mime_type(raw_mime=accept, default_raw_mime=content_type)
 		event.environment["response"]["headers"]["Content-Type"] = interpreted_mime_type
-
 		try:
 			if not event.isInstance(event_class):
 				event = event.convert(event_class)
-			event.data = self.format_response_data(event)
 		except (InvalidEventConversion, MalformedEventData) as err:
 			event.error = err
-			self.send_error(event)
-		else:
-			self.send_event(event)
+			#self.send_error(event)
+		data = self.format_response_data(event)
+		event.data = data
+		event = event.convert(convert_to=HttpEvent, force=True)
+		self.send_event(event)
+
+
 
 class ServiceRouter(Actor):
 	def __is_cors(self, event):

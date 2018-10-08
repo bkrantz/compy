@@ -1,3 +1,6 @@
+from compy.actors.util.mysql import MySQLConnectionPool, _MySQLConnectionManager
+from pymysql import IntegrityError, ProgrammingError, NotSupportedError, DataError
+import gevent, re
 
 __all__ = [
 	"_MySQLMixin",
@@ -36,7 +39,6 @@ class _MySQLMixin:
 				fetched_results = manager.fetchall()
 			except Exception as e:
 				pass
-			print fetched_results
 			results = [result for result in fetched_results if result] if fetched_results else []
 		return results
 
@@ -48,10 +50,14 @@ class _MySQLAutoMixin:
 		results = self._execute_query(query=query)
 		return [result.get('COLUMN_NAME') for result in results]
 
+	def __format_value(self, value):
+		value = value.replace("'", "\\'")
+		return "'%s'" % value
+
 	def _assemble_query(self, query_template, query_params={}, *args, **kwargs):
-		query_params = {field: query_params.get(field, '') if field in self.literal_params else "'%s'" % query_params.get(field, '') for field in self.table_fields if query_params.get(field, None) is not None}
+		query_params = {"`%s`"%field: query_params.get(field, '') if field in self.literal_params else self.__format_value(query_params.get(field, '')) for field in self.table_fields if query_params.get(field, None) is not None}
 		values = ", ".join([value for key, value in query_params.iteritems()])
-		fields = ", ".join([key for key in query_params.iterkeys()])
+		fields = ", ".join(["%s" % key for key in query_params.iterkeys()])
 		updates = ", ".join(["%s=%s" % (field, value) for field, value in query_params.iteritems()])
 		likes = " AND ".join(["%s LIKE %s" % (field, value) for field, value in query_params.iteritems()])
 		query = query_template.format(__schema=self.schema, __table=self.table, __fields=fields, __values=values, __updates=updates, __likes=likes)

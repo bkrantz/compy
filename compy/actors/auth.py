@@ -1,7 +1,7 @@
-from compy.mixins.mysql import _MySQLMixin
+from compy.actors.mixins.mysql import _MySQLMixin
 from compy.actors.database import _Database
-from compy.mixins.database import _DatabaseMixin
-from compy.mixins.auth import _AuthDatabaseMixin, _BasicAuthDatabaseMixin
+from compy.actors.mixins.database import _DatabaseMixin
+from compy.actors.mixins.auth import _AuthDatabaseMixin, _BasicAuthDatabaseMixin
 
 __all__ = [
     "MySQLBasicAuth"

@@ -1,21 +1,11 @@
-import re
-import traceback
-from lxml import etree
 from compy.actor import Actor
 from compy.errors import MalformedEventData
+from compy.actors.util.database import InvalidResultsException
 
 __all__ = [
 	"_Database",
 	"_DatabaseAuto"
 ]
-
-class InvalidResultsException(Exception):
-	def __init__(self, expected, received, *args, **kwargs):
-		message = "Query returned unexpected results. Expected {expected} but received {received}".format(
-			expected=expected, received=received)
-		self.expected = expected
-		self.received = received
-		super(InvalidResultsException, self).__init__(message, *args, **kwargs)
 
 class _Database(Actor):
 
