@@ -79,7 +79,7 @@ class _EventConversionMixin:
             current_event = self
         return convert_to in current_event.conversion_parents or convert_to == current_event.__class__
 
-    def convert(self, convert_to, current_event=None, force=False):
+    def convert(self, convert_to, current_event=None, force=False, ignore_data=False):
         if current_event is None:
             current_event = self
         try:
@@ -87,7 +87,8 @@ class _EventConversionMixin:
                 return current_event
             new_class = convert_to.__new__(convert_to)
             new_class.__dict__.update(current_event.__dict__)
-            new_class.data = current_event.data
+            if not ignore_data:
+                new_class.data = current_event.data
         except Exception as err:
             raise InvalidEventConversion("Unable to convert event. <Attempted {old} -> {new}>".format(old=current_event.__class__, new=convert_to))
         return new_class
@@ -105,14 +106,11 @@ class _EventFormatMixin(_EventConversionMixin):
 
     def format_error(self):
         if self.error:
-            if hasattr(self.error, 'override') and self.error.override:
-                return self.error.override
-            else:
-                messages = self.error.message
-                if not isinstance(messages, list):
-                    messages = [messages]
-                errors = map(lambda _error: dict(message=str(getattr(_error, "message", _error)), **self.error.__dict__), messages)
-                return errors
+            messages = self.error.message
+            if not isinstance(messages, list):
+                messages = [messages]
+            errors = map(lambda _error: dict(message=str(getattr(_error, "message", _error)), **self.error.__dict__), messages)
+            return errors
         else:
             return None
 
@@ -140,33 +138,21 @@ class _XMLEventFormatMixin(_XMLEventConversionMixin, _EventFormatMixin):
             return None
 
     def format_error(self):
-        errors = super(_XMLFormatInterface, self).format_error()
-        if self.error and self.error.override:
-            try:
-                result = etree.fromstring(errors)
-            except Exception:
-                result = errors
-        elif errors:
+        errors = _EventFormatMixin.format_error(self)
+        if errors is not None and len(errors) > 0:
             result = etree.Element("errors")
             for error in errors:
                 error_element = etree.Element("error")
                 message_element = etree.Element("message")
-                code_element = etree.Element("code")
                 error_element.append(message_element)
                 message_element.text = error['message']
-                if getattr(error, 'code', None) or ('code' in error and error['code']):
-                    code_element.text = error['code']
-                    error_element.append(code_element)
                 result.append(error_element)
         return result
 
     def error_string(self):
         error = self.format_error()
         if error is not None:
-            try:
-                error = etree.tostring(error, pretty_print=True)
-            except Exception:
-                pass
+            error = etree.tostring(error, pretty_print=True)
         return error
 
 class _JSONEventFormatMixin(_JSONEventConversionMixin, _EventFormatMixin):
@@ -184,7 +170,7 @@ class _JSONEventFormatMixin(_JSONEventConversionMixin, _EventFormatMixin):
         error = self.format_error()
         if error:
             try:
-                error = json.dumps(error)
+                error = json.dumps({"errors": error})
             except Exception:
                 pass
         return error

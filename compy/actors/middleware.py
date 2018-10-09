@@ -131,50 +131,51 @@ class RequestInterpretor(__HTTPInterpretor):
 				event = event.convert(event_class)
 		except (InvalidEventConversion, MalformedEventData) as err:
 			self.logger.error("Unable to Interpret Request: %s" % err)
-			event.error = err
+			event.error = MalformedEventData("Unable to interpret request")
 			self.send_error(event)
 		else:
 			self.logger.info("Interpreted Request's Content-Type '%s' AS '%s': Using event class '%s'" % (raw_mime_type, interpreted_mime_type, event_class.__name__))
 			self.send_event(event)
 
 class ResponseInterpretor(__HTTPInterpretor):
-	def format_response_data(self, event):
-		if event.error:
-			if isinstance(event.data, (list, dict, str)):
-				response_data = json.dumps({"errors": event.format_error()})
-			else:
-				response_data = event.error_string()
+
+	def try_convert(self, event, event_class, ignore_data=False):
+		if not event.isInstance(event_class):
+			event = event.convert(convert_to=event_class, ignore_data=ignore_data)
+		return event
+
+	def process_error(self, event, event_class):
+		event = self.try_convert(event=event, event_class=event_class, ignore_data=True)
+		new_data = event.error_string()
+		event.error = None
+		return event, new_data
+
+	def format_event(self, event, event_class):
+		new_data = None
+		if event.error is not None:
+			event, new_data = self.process_error(event=event, event_class=event_class)
 		else:
-			response_data = event.data_string()
-			if not isinstance(event.data, (list, dict, str)) or \
-					(isinstance(event.data, dict) and \
-						len(event.data) == 1 and \
-						event.data.get("data", None)):
-				response_data = event.data_string()
+			try:
+				event = self.try_convert(event=event, event_class=event_class)
+			except (InvalidEventConversion, MalformedEventData) as err:
+				event.error = err
+				event, new_data = self.process_error(event=event, event_class=event_class)
 			else:
-				response_dict = event.data
-				response_data = json.dumps(response_dict)
-		return response_data
+				new_data = event.data_string()
+		event = event.convert(convert_to=HttpEvent, force=True, ignore_data=True)
+		event.data = new_data
+		return event
 
 	def consume(self, event, *args, **kwargs):
 		accept = event.environment["request"]["headers"].get("Accept", "").split(";")[0]
 		content_type = event.environment["request"].get("interpreted_content_type", None)
 		interpreted_mime_type, event_class, _ = self._interpret_mime_type(raw_mime=accept, default_raw_mime=content_type)
 		event.environment["response"]["headers"]["Content-Type"] = interpreted_mime_type
-		try:
-			if not event.isInstance(event_class):
-				event = event.convert(event_class)
-		except (InvalidEventConversion, MalformedEventData) as err:
-			event.error = err
-			#self.send_error(event)
-		data = self.format_response_data(event)
-		event.data = data
-		event = event.convert(convert_to=HttpEvent, force=True)
+		event = self.format_event(event=event, event_class=event_class)
 		self.send_event(event)
 
-
-
 class ServiceRouter(Actor):
+
 	def __is_cors(self, event):
 		origin = event.environment["request"]["headers"].get("Origin", None)
 		cur_method = event.environment["request"]["method"]
@@ -184,12 +185,19 @@ class ServiceRouter(Actor):
 		return False
 
 	def consume(self, event, *args, **kwargs):
-		queue_name = event.service or self.name
-		queue = self.pool.outbound.get(queue_name, None)
+		service, queue = event.service, None
+		if service is not None:
+			queue = self.pool.outbound.get(service, None)
+			if queue is None:
+				queue = self.pool.outbound.get("unservicable", None)
+		if queue is None:
+			queue = self.pool.outbound.get(self.name, None)
+		if queue is None:
+			queue = self.pool.outbound.get("default", None)
 		if self.__is_cors(event=event):
 			queue = self.pool.outbound.get("cors", queue)
 		if queue is None:
-			self.logger.error("Queue name '{queue_name}' was not found".format(queue_name=queue_name))
+			self.logger.error("Queue name '{queue_name}' was not found".format(queue_name=(service or self.name)))
 			self.send_error(event)
 		else:
 			self.send_event(event, queues=[queue])
