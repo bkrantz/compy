@@ -6,7 +6,8 @@ __all__ = [
 	"_MySQLMixin",
 	"_MySQLAutoMixin",
 	"_MySQLInsertMixin",
-	"_MySQLWriteMixin"
+	"_MySQLWriteMixin",
+	"_MySQLSelectMixin"
 ]
 
 class _MySQLMixin:
@@ -68,4 +69,7 @@ class _MySQLInsertMixin:
 
 class _MySQLWriteMixin:
 	_query_template = "INSERT INTO {__schema}.{__table} ({__fields}) VALUES ({__values}) ON DUPLICATE KEY UPDATE {__updates}"
+
+class _MySQLSelectMixin:
+	_query_template = "SELECT * FROM {__schema}.{__table} WHERE {__likes}"
 
