@@ -1,6 +1,6 @@
 from compy.actors.database import _Database, _DatabaseAuto
 from compy.actors.mixins.database import _XMLDatabaseMixin, _JSONDatabaseMixin
-from compy.actors.mixins.mysql import _MySQLMixin, _MySQLAutoMixin, _MySQLInsertMixin, _MySQLWriteMixin
+from compy.actors.mixins.mysql import _MySQLMixin, _MySQLAutoMixin, _MySQLInsertMixin, _MySQLWriteMixin, _MySQLSelectMixin
 
 __all__ = [
 	"XMLMySQLActor",
