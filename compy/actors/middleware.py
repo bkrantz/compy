@@ -147,7 +147,6 @@ class ResponseInterpretor(__HTTPInterpretor):
 	def process_error(self, event, event_class):
 		event = self.try_convert(event=event, event_class=event_class, ignore_data=True)
 		new_data = event.error_string()
-		event.error = None
 		return event, new_data
 
 	def format_event(self, event, event_class):

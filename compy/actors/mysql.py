@@ -19,7 +19,7 @@ class XMLMySQLInsertActor(_XMLDatabaseMixin, _MySQLMixin, _MySQLInsertMixin, _My
 	pass
 class XMLMySQLWriteActor(_XMLDatabaseMixin, _MySQLMixin, _MySQLWriteMixin, _MySQLAutoMixin, _DatabaseAuto):
 	pass
-class XMLMySQLWriteActor(_XMLDatabaseMixin, _MySQLMixin, _MySQLSelectMixin, _MySQLAutoMixin, _DatabaseAuto):
+class XMLMySQLSelectActor(_XMLDatabaseMixin, _MySQLMixin, _MySQLSelectMixin, _MySQLAutoMixin, _DatabaseAuto):
 	pass
 
 class JSONMySQLActor(_JSONDatabaseMixin, _MySQLMixin, _Database):

@@ -59,9 +59,10 @@ class _MySQLAutoMixin:
 		query_params = {"`%s`"%field: query_params.get(field, '') if field in self.literal_params else self.__format_value(query_params.get(field, '')) for field in self.table_fields if query_params.get(field, None) is not None}
 		values = ", ".join([value for key, value in query_params.iteritems()])
 		fields = ", ".join(["%s" % key for key in query_params.iterkeys()])
+		all_fields = ", ".join(self.table_fields)
 		updates = ", ".join(["%s=%s" % (field, value) for field, value in query_params.iteritems()])
 		likes = " AND ".join(["%s LIKE %s" % (field, value) for field, value in query_params.iteritems()])
-		query = query_template.format(__schema=self.schema, __table=self.table, __fields=fields, __values=values, __updates=updates, __likes=likes)
+		query = query_template.format(__schema=self.schema, __table=self.table, __all_fields=all_fields, __fields=fields, __values=values, __updates=updates, __likes=likes)
 		return query
 
 class _MySQLInsertMixin:
@@ -71,5 +72,5 @@ class _MySQLWriteMixin:
 	_query_template = "INSERT INTO {__schema}.{__table} ({__fields}) VALUES ({__values}) ON DUPLICATE KEY UPDATE {__updates}"
 
 class _MySQLSelectMixin:
-	_query_template = "SELECT * FROM {__schema}.{__table} WHERE {__likes}"
+	_query_template = "SELECT {__all_fields} FROM {__schema}.{__table} WHERE {__likes}"
 
