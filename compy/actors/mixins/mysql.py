@@ -61,7 +61,7 @@ class _MySQLAutoMixin:
 		fields = ", ".join(["%s" % key for key in query_params.iterkeys()])
 		all_fields = ", ".join(self.table_fields)
 		updates = ", ".join(["%s=%s" % (field, value) for field, value in query_params.iteritems()])
-		likes = " AND ".join(["%s LIKE %s" % (field, value) for field, value in query_params.iteritems()])
+		likes = " AND ".join(["1 = 1"] + ["%s LIKE %s" % (field, value) for field, value in query_params.iteritems()])
 		query = query_template.format(__schema=self.schema, __table=self.table, __all_fields=all_fields, __fields=fields, __values=values, __updates=updates, __likes=likes)
 		return query
 

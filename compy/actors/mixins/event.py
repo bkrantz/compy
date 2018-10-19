@@ -43,6 +43,8 @@ class _ConversionMethods:
             return collections.defaultdict(lambda: lambda data: data)
 
     def __internal_xmlify(self, _json):
+        if isinstance(_json, dict) and len(_json) == 0:
+            _json = {"jsonified_envelope": {}}
         if isinstance(_json, list) or len(_json) > 1:
             _json = {"jsonified_envelope": _json}
         _, value = next(_json.iteritems())

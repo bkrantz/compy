@@ -53,14 +53,19 @@ class _XMLDatabaseMixin(XMLEventModifyMixin, _DatabaseMixin, XPathLookupMixin):
 		dynamic_scopes = self.lookup(obj=event, key_chain=self.param_scope)
 		for dynamic_scope in dynamic_scopes:
 			params = {}
-			children = list(dynamic_scope)
-			for child in children:
-				try:
-					if params.get(child.tag, None) is None:
-						params[child.tag] = child.text
-				except AttributeError:
-					pass
-			param_groups.append(params)
+			try:
+				children = list(dynamic_scope)
+			except TypeError:
+				pass #ignores None scopes
+			else:
+				for child in children:
+					try:
+						if params.get(child.tag, None) is None:
+							params[child.tag] = child.text
+					except AttributeError:
+						pass
+				param_groups.append(params)
+
 		return param_groups
 
 	def _format_results(self, event, results):
