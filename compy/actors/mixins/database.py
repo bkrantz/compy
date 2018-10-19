@@ -1,5 +1,6 @@
 from compy.actors.mixins.event import JSONEventModifyMixin, XMLEventModifyMixin, LookupMixin, XPathLookupMixin
 import json
+from lxml import etree
 
 __all__ = [
 	"_DatabaseMixin",
