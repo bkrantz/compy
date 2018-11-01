@@ -16,7 +16,7 @@ class Director(object):
 
     _async_class = event.Event
 
-    def __init__(self, size=500, name="default", generate_blockdiag=True, blockdiag_dir="./build/blockdiag"):
+    def __init__(self, size=500, name="default", *args, **kwargs):
         gsignal(signal.SIGINT, self.stop)
         gsignal(signal.SIGTERM, self.stop)
 
@@ -30,11 +30,6 @@ class Director(object):
         self.__running = False
         self.__block = self._async_class()
         self.__block.clear()
-
-        self.blockdiag_dir = blockdiag_dir
-        self.generate_blockdiag = generate_blockdiag
-        if generate_blockdiag:
-            self.blockdiag_out = """diagram admin {\n"""
 
     def get_actor(self, name):
         actor = self.actors.get(name, None)
@@ -95,9 +90,7 @@ class Director(object):
             for destination in destinations:
                 (destination_name, destination_queue_name) = self._parse_connect_arg(destination)
                 destination = self.get_actor(destination_name)
-                if self.generate_blockdiag:
-                    self.blockdiag_out += "{0} -> {1};\n".format(source.name, destination.name)
-
+                
                 if destination_queue_name is None:
                     if source_queue_name is None:
                         destination_queue_name = source.name
@@ -144,13 +137,7 @@ class Director(object):
         if not isinstance(actor, Actor):
             actor = self.__create_actor(actor, name, *args, **kwargs)
 
-
         self.actors[actor.name] = actor
-        if self.generate_blockdiag:
-            self.blockdiag_out += "{0} [".format(actor.name)
-            for key, value in actor.blockdiag_config.iteritems():
-                self.blockdiag_out += "{0} = \"{1}\"".format(key, value)
-            self.blockdiag_out += "]\n"
         return actor
 
     def register_log_actor(self, actor, name, *args, **kwargs):
@@ -195,8 +182,6 @@ class Director(object):
         self.log_actor.start()
         self.error_actor.start()
 
-        if self.generate_blockdiag:
-            self.finalize_blockdiag()
         if block:
             self.block()
 
