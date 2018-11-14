@@ -40,7 +40,7 @@ class CORSController(Actor):
 		headers = event.environment["request"]["headers"].get("Access-Control-Request-Headers", None)
 		
 		new_headers = {}
-		if len(self.origins) == 0 or origin in self.origins:
+		if origin in self.origins:
 			new_headers["Access-Control-Allow-Origin"] = origin
 
 		if method is not None:
