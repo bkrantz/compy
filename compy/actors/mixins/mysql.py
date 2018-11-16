@@ -7,7 +7,8 @@ __all__ = [
 	"_MySQLAutoMixin",
 	"_MySQLInsertMixin",
 	"_MySQLWriteMixin",
-	"_MySQLSelectMixin"
+	"_MySQLSelectMixin",
+	"_MySQLDeleteMixin"
 ]
 
 class _MySQLMixin:
@@ -73,4 +74,7 @@ class _MySQLWriteMixin:
 
 class _MySQLSelectMixin:
 	_query_template = "SELECT {__all_fields} FROM {__schema}.{__table} WHERE {__likes}"
+
+class _MySQLDeleteMixin:
+	_query_template = "DELETE FROM {__schema}.{__table} WHERE {__likes}"
 
